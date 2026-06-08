@@ -17,6 +17,9 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
+    # streamable-http transport requires mcp>=1.8.0; FastMCP itself is
+    # re-exported from mcp.server.fastmcp so the import path is unchanged.
+    "mcp>=1.8.0",
     "fastmcp>=2.0.0",
 ]
 

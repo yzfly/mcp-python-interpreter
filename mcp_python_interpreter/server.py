@@ -950,4 +950,7 @@ Please help by:
 
 # Run the server
 if __name__ == "__main__":
-    mcp.run(transport='stdio')
+    # Delegate transport selection to main.py so `python server.py` and the
+    # console-script entrypoint behave identically.
+    from mcp_python_interpreter.main import main
+    main()
