@@ -641,12 +641,11 @@ async def run_python_file(
         timeout: Maximum execution time in seconds (default: 300)
     """
     path = Path(file_path)
-    if path.is_absolute():
-        if not is_path_allowed(path):
-            return f"Access denied: Can only run files in working directory: {WORKING_DIR}"
-    else:
+    if not path.is_absolute():
         path = WORKING_DIR / path
-    
+    if not is_path_allowed(path):
+        return f"Access denied: Can only run files in working directory: {WORKING_DIR}"
+
     if not path.exists():
         return f"File '{path}' not found."
     
@@ -729,11 +728,10 @@ def read_file(file_path: str, max_size_kb: int = 1024) -> str:
         max_size_kb: Maximum file size to read in KB
     """
     path = Path(file_path)
-    if path.is_absolute():
-        if not is_path_allowed(path):
-            return f"Access denied: Can only read files in working directory: {WORKING_DIR}"
-    else:
+    if not path.is_absolute():
         path = WORKING_DIR / path
+    if not is_path_allowed(path):
+        return f"Access denied: Can only read files in working directory: {WORKING_DIR}"
     
     try:
         if not path.exists():
@@ -779,11 +777,10 @@ def write_file(
         overwrite: Whether to overwrite if exists
     """
     path = Path(file_path)
-    if path.is_absolute():
-        if not is_path_allowed(path):
-            return f"Access denied: Can only write files in working directory: {WORKING_DIR}"
-    else:
+    if not path.is_absolute():
         path = WORKING_DIR / path
+    if not is_path_allowed(path):
+        return f"Access denied: Can only write files in working directory: {WORKING_DIR}"
     
     try:
         if path.exists() and not overwrite:
@@ -816,11 +813,10 @@ def list_directory(directory_path: str = "") -> str:
             path = WORKING_DIR
         else:
             path = Path(directory_path)
-            if path.is_absolute():
-                if not is_path_allowed(path):
-                    return f"Access denied: Can only list files in working directory: {WORKING_DIR}"
-            else:
+            if not path.is_absolute():
                 path = WORKING_DIR / directory_path
+            if not is_path_allowed(path):
+                return f"Access denied: Can only list files in working directory: {WORKING_DIR}"
                 
         if not path.exists():
             return f"Error: Directory '{directory_path}' not found"
