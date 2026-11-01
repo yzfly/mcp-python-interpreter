@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mcp-python-interpreter"
-version = "1.2.4"
+version = "1.2.5"
 description = "MCP server for Python code execution and environment management"
 authors = [
     {name = "YZFly", email = "ethereal_ai@hotmail.com"},
@@ -17,10 +17,8 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    # streamable-http transport requires mcp>=1.8.0; FastMCP itself is
-    # re-exported from mcp.server.fastmcp so the import path is unchanged.
-    "mcp>=1.8.0",
-    "fastmcp>=2.0.0",
+    # Use the MCP SDK's server directly; the standalone fastmcp package is not needed.
+    "mcp>=1.8.0,<3",
 ]
 
 [project.scripts]
