@@ -2,7 +2,7 @@
 
 import os
 
-from mcp_python_interpreter.server import mcp
+from mcp_python_interpreter.server import MCP_SDK_V2, mcp
 
 
 def main():
@@ -44,12 +44,12 @@ def main():
             "'stdio', 'streamable-http', or 'sse'."
         )
 
-    # FastMCP's host/port come from its Settings object (FASTMCP_HOST /
-    # FASTMCP_PORT env vars or constructor kwargs) — they are NOT accepted
-    # as kwargs to .run(). Mutate settings in place so users can drive them
-    # with the same MCP_* env vars used elsewhere.
-    mcp.settings.host = os.environ.get('MCP_HOST', '0.0.0.0')
-    mcp.settings.port = int(os.environ.get('MCP_PORT', '8000'))
+    # SDK 1 keeps transport options on .settings; SDK 2 accepts them on
+    # .run(). Keep our MCP_* environment interface identical for both.
+    options = {
+        'host': os.environ.get('MCP_HOST', '0.0.0.0'),
+        'port': int(os.environ.get('MCP_PORT', '8000')),
+    }
 
     # streamable-http response framing: SSE-streamed (default) vs single
     # application/json reply. Some MCP gateways (e.g. bifrost) only parse
@@ -59,9 +59,9 @@ def main():
     json_resp_env = os.environ.get('MCP_JSON_RESPONSE', '').lower()
     if transport == 'streamable-http':
         if json_resp_env in ('1', 'true', 'yes', ''):
-            mcp.settings.json_response = True
+            options['json_response'] = True
         elif json_resp_env in ('0', 'false', 'no'):
-            mcp.settings.json_response = False
+            options['json_response'] = False
 
         # Stateless mode: spawn a fresh transport per request, no session
         # tracking required. This is what most MCP gateways (bifrost,
@@ -72,9 +72,9 @@ def main():
         # MCP_STATELESS_HTTP=false to keep stateful sessions.
         stateless_env = os.environ.get('MCP_STATELESS_HTTP', '').lower()
         if stateless_env in ('1', 'true', 'yes', ''):
-            mcp.settings.stateless_http = True
+            options['stateless_http'] = True
         elif stateless_env in ('0', 'false', 'no'):
-            mcp.settings.stateless_http = False
+            options['stateless_http'] = False
 
     # Transport-security (DNS-rebinding) config.
     disable_dns_rebinding = os.environ.get(
@@ -98,6 +98,17 @@ def main():
                 enable_dns_rebinding_protection=True,
                 allowed_hosts=extra,
             )
+        options['transport_security'] = tss
+
+    if MCP_SDK_V2:
+        mcp.run(transport=transport, **options)
+        return
+
+    for name, value in options.items():
+        if name != 'transport_security':
+            setattr(mcp.settings, name, value)
+
+    if 'transport_security' in options:
         # FastMCP threads transport_security through .settings only on very
         # recent SDKs; on older ones we have to drop down a level and pass
         # it directly to the async runner.

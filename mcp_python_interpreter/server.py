@@ -20,8 +20,13 @@ from typing import Dict, List, Optional, Any
 import asyncio
 import concurrent.futures
 
-# Import MCP SDK
-from mcp.server.fastmcp import FastMCP
+# The SDK renamed FastMCP and moved transport settings in version 2.
+try:
+    from mcp.server.mcpserver import MCPServer
+    MCP_SDK_V2 = True
+except ImportError:
+    from mcp.server.fastmcp import FastMCP as MCPServer
+    MCP_SDK_V2 = False
 
 # Parse command line arguments
 parser = argparse.ArgumentParser(description='MCP Python Interpreter')
@@ -44,7 +49,7 @@ print(f"System-wide file access: {'ENABLED' if ALLOW_SYSTEM_ACCESS else 'DISABLE
 print(f"Platform: {sys.platform}", file=sys.stderr)
 
 # Create MCP server
-mcp = FastMCP("python-interpreter")
+mcp = MCPServer("python-interpreter")
 
 # Thread pool for subprocess fallback
 _executor = concurrent.futures.ThreadPoolExecutor(max_workers=4)
@@ -101,7 +106,8 @@ class ReplSession:
                     # If not an expression, execute as statement
                     exec(code, self.locals)
                     
-            except Exception:
+            except (Exception, SystemExit):
+                # User code must not terminate the MCP transport with sys.exit().
                 traceback.print_exc()
                 status = 1
             finally:
@@ -517,7 +523,8 @@ async def run_python_code(
     session_id: str = "default",
     environment: str = "system",
     save_as: Optional[str] = None,
-    timeout: int = 300
+    timeout: int = 300,
+    overwrite: bool = False
 ) -> str:
     """
     Execute Python code with flexible execution modes.
@@ -527,8 +534,9 @@ async def run_python_code(
         execution_mode: Execution mode - "inline" (default, fast, in-process) or "subprocess" (isolated)
         session_id: Session ID for inline mode to maintain state across executions
         environment: Python environment name (only for subprocess mode)
-        save_as: Optional filename to save the code before execution
+        save_as: Optional filename to save the code before execution (within --dir by default)
         timeout: Maximum execution time in seconds (only enforced for subprocess mode)
+        overwrite: Allow replacing an existing save_as file (default: False)
     
     Returns:
         Execution result with output
@@ -540,19 +548,27 @@ async def run_python_code(
       environment isolation or a different Python environment.
     """
     
-    # Save code if requested
+    if execution_mode not in ("inline", "subprocess"):
+        return f"Unknown execution mode: {execution_mode}. Use 'inline' or 'subprocess'."
+
+    # Validate the final filename, including its normalized .py suffix, before
+    # creating directories or executing any code. Exclusive creation prevents
+    # silent replacement when overwrite was not explicitly requested.
     if save_as:
-        save_path = WORKING_DIR / save_as
-        if not save_path.suffix == '.py':
-            save_path = save_path.with_suffix('.py')
-            
         try:
+            save_path = WORKING_DIR / save_as
+            if save_path.suffix != '.py':
+                save_path = save_path.with_suffix('.py')
+            if not is_path_allowed(save_path):
+                return f"Access denied: Can only save files in working directory: {WORKING_DIR}"
             save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path, 'w', encoding='utf-8') as f:
+            with open(save_path, 'w' if overwrite else 'x', encoding='utf-8') as f:
                 f.write(code)
+        except FileExistsError:
+            return f"File '{save_path}' exists. Use overwrite=True to replace."
         except Exception as e:
             return f"Error saving code to file: {str(e)}"
-    
+
     # Execute based on mode
     if execution_mode == "inline":
         # In-process execution (default, fast, no subprocess issues)

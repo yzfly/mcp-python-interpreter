@@ -25,7 +25,7 @@ pip install mcp-python-interpreter
 Or with uv:
 
 ```bash
-uv install mcp-python-interpreter
+uv tool install mcp-python-interpreter
 ```
 
 ## Usage with Claude Desktop
@@ -48,8 +48,8 @@ uv install mcp-python-interpreter
             "/path/to/your/python"
         ],
         "env": {
-            "MCP_ALLOW_SYSTEM_ACCESS": 0
-        },
+            "MCP_ALLOW_SYSTEM_ACCESS": "0"
+        }
     }
   }
 }
@@ -71,7 +71,7 @@ For Windows:
       ],
         "env": {
             "MCP_ALLOW_SYSTEM_ACCESS": "0"
-        },
+        }
     }
   }
 }
@@ -80,7 +80,7 @@ For Windows:
 5. Restart Claude Desktop
 6. You should now see the MCP tools icon in the chat interface
 
-The `--dir` parameter is **required** and specifies where all files will be saved and executed. This helps maintain security by isolating the MCP server to a specific directory.
+The `--dir` parameter sets the working directory (default: the directory where the server starts). File tools and `run_python_code(save_as=...)` restrict paths to this directory unless `MCP_ALLOW_SYSTEM_ACCESS=1` is set. It is **not a sandbox** for executed Python code.
 
 ### Prerequisites
 
@@ -103,7 +103,7 @@ The Python Interpreter provides the following tools:
 - **install_package**: Install a Python package in a specific environment
 
 ### Code Execution
-- **run_python_code**: Execute Python code in a specific environment
+- **run_python_code**: Execute Python code inline or in a subprocess. Optional `save_as` saves a `.py` file before execution; existing files require `overwrite=true`. A rejected save does not execute the code.
 - **run_python_file**: Execute a Python file in a specific environment
 
 ### File Operations
@@ -147,17 +147,18 @@ The MCP Python Interpreter now supports comprehensive file operations:
 - Write text and binary files
 - Syntax highlighting for source code files
 - Hex representation for binary files
-- Strict file path security (only within the working directory)
+- File-tool path checks within the working directory by default, including `save_as`
 
 ## Security Considerations
 
-This MCP server has access to your Python environments and file system. Key security features include:
-- Isolated working directory
-- File size limits
-- Prevented writes outside the working directory
-- Explicit overwrite protection
+File tools and `run_python_code(save_as=...)` check resolved paths, including symlinks, against the working directory unless `MCP_ALLOW_SYSTEM_ACCESS=1` is explicitly enabled. Existing files require an explicit overwrite flag; saved snippets use exclusive creation by default.
 
-Always be cautious about running code or file operations that you don't fully understand.
+Inline and subprocess execution run arbitrary Python with the server user's permissions. They can access files or the network independently of these file-tool checks. A subprocess separates interpreter state; it is not an operating-system sandbox. Run only trusted code, or isolate the entire server with a container or a restricted user account. Inline execution has no enforced timeout. `sys.exit()` is reported as an execution error without stopping the MCP server.
+
+## MCP SDK compatibility
+
+Version 1.2.5 supports MCP Python SDK 1.x (`FastMCP`) and 2.x (`MCPServer`). The standalone `fastmcp` package is not required. The `MCP_TRANSPORT`, `MCP_HOST`, `MCP_PORT`, `MCP_JSON_RESPONSE`, `MCP_STATELESS_HTTP`, and transport-security environment settings work with either SDK version.
+
 
 ## License
 
